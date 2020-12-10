@@ -16,8 +16,9 @@ try {
             if (isset($_POST['email'], $_POST['password'])) {
                 $output['success'] = false;
                 $password = substr(hash('sha256', $_POST['password']), 5, 32);
-                if (login($connection, $_POST['email'], $password)) {
+                if ($data = login($connection, $_POST['email'], $password)) {
                     $output['success'] = true;
+                    $output['user_id'] = $data['id'];
                 }
             }
         }
@@ -40,15 +41,34 @@ try {
             else {
                 $tests = fetchSpeedTests($connection);
             }
+            $testsResponse = [];
             foreach ($tests as $test) {
-                $tests[] = [
+                $testsResponse[] = [
                     'test_id' => $test['id'],
                     'user_id' => $test['user_id'],
                     'test_data' => $test['data'],
                 ];
             }
             $output['success'] = true;
-            $output['speed_tests'] = $tests;
+            $output['speed_tests'] = $testsResponse;
+        }
+
+        if ($_GET['action'] === 'get_user_settings') {
+            $output['success'] = false;
+            if (isset($_GET['user_id'])) {
+                $settings = getUserSettings($connection, $_GET['user_id'])[0];
+                $output['success'] = true;
+                $output['settings'] = $settings;
+            }
+        }
+
+        if ($_GET['action'] === 'update_user_settings') {
+            $output['success'] = false;
+            if (isset($_POST['user_id'], $_POST['can_compare_tests'])) {
+                $canCompareTests = $_POST['can_compare_tests'] === 'true' ? 1 : 0;
+                updateUserSettings($connection, $_POST['user_id'], $canCompareTests);
+                $output['success'] = true;
+            }
         }
 
     }
@@ -59,17 +79,17 @@ try {
 
 echo json_encode($output);
 
-function login($connection, string $email, string $password): bool
+function login($connection, string $email, string $password): ?array
 {
     $stmt = $connection->prepare("SELECT * FROM user WHERE email = ? AND password = ?");
     $stmt->execute([$email, $password]);
     $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($data) {
-        return true;
+        return $data;
     }
 
-    return false;
+    return null;
 }
 
 function insertSpeedData($connection, int $userId, string $speedTestData): bool
@@ -94,4 +114,20 @@ function fetchUserSpeedTests($connection, int $userId): array
     $stmt->execute([$userId]);
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function getUserSettings($connection, int $userId)
+{
+    $stmt = $connection->prepare('SELECT * FROM settings WHERE user_id=?');
+    $stmt->execute([$userId]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function updateUserSettings($connection, int $userId, int $canCompareTests)
+{
+    $stmt = $connection->prepare('UPDATE `settings` SET `can_compare_tests` = ? WHERE user_id=?;');
+    $stmt->execute([$canCompareTests, $userId]);
+
+    return true;
 }
