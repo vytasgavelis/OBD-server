@@ -27,7 +27,7 @@ try {
             if (isset($_POST['email'], $_POST['password'])) {
                 $output['success'] = false;
                 $errors = [];
-                if (strlen($_POST['password']) <= 8) {
+                if (strlen($_POST['password']) < 8) {
                     $errors[] = 'Slaptazodis turi susidaryti bent is 8 simboliu.';
                 }
                 if (!filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) {
@@ -43,6 +43,9 @@ try {
                         $connection, $_POST['email'],
                         substr(hash('sha256', $_POST['password']), 5, 32)
                     );
+                    $userId = findUserByEmail($connection, $_POST['email'])['id'];
+                    insertUserSetting($connection, $userId, 1);
+                    $output['user_id'] = $userId;
                 }
             }
         }
@@ -163,6 +166,14 @@ function updateUserSettings($connection, int $userId, int $canCompareTests)
 {
     $stmt = $connection->prepare('UPDATE `settings` SET `can_compare_tests` = ? WHERE user_id=?;');
     $stmt->execute([$canCompareTests, $userId]);
+
+    return true;
+}
+
+function insertUserSetting($connection, int $userId, int $canCompareTests): bool
+{
+    $stmt = $connection->prepare('INSERT INTO settings (user_id, can_compare_tests) VALUES(?, ?)');
+    $stmt->execute([$userId, $canCompareTests]);
 
     return true;
 }
