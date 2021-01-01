@@ -61,19 +61,22 @@ try {
 
         if ($_GET['action'] === 'get_tests') {
             // Fetch tests by user id
+            $type = $_GET['type'] ?? null;
+
             if (isset($_GET['user_id'])) {
-                $tests = fetchUserSpeedTests($connection, $_GET['user_id']);
+                $tests = fetchUserSpeedTests($connection, $_GET['user_id'], $type);
             }
             // Fetch all tests
             else {
-                $tests = fetchSpeedTests($connection);
+                $tests = fetchSpeedTests($connection, $type);
             }
             $testsResponse = [];
             foreach ($tests as $test) {
                 $testsResponse[] = [
-                    'test_id' => $test['id'],
-                    'user_id' => $test['user_id'],
+                    'test_id'   => $test['id'],
+                    'user_id'   => $test['user_id'],
                     'test_data' => $test['data'],
+                    'type'      => $test['type'],
                 ];
             }
             $output['success'] = true;
@@ -107,6 +110,7 @@ try {
     $output['message'] = 'Unexpected error.';
 }
 
+header('Content-Type: application/json');
 echo json_encode($output);
 
 function login($connection, string $email, string $password): ?array
@@ -130,26 +134,43 @@ function insertSpeedData($connection, int $userId, string $speedTestData): bool
     return true;
 }
 
-function fetchSpeedTests($connection): array
+function fetchSpeedTests($connection, ?string $type): array
 {
-    $stmt = $connection->prepare('
-        SELECT `speed_test`.`id`, `speed_test`.`user_id`, `speed_test`.`data` FROM `speed_test`
+    $parameters = [];
+    $query = '
+        SELECT `speed_test`.`id`, `speed_test`.`user_id`, `speed_test`.`data`, `speed_test`.`type` FROM `speed_test`
         JOIN settings ON speed_test.user_id=settings.user_id
         WHERE settings.can_compare_tests=1 
-    ');
-    $stmt->execute([]);
+    ';
+
+    if ($type) {
+        $query .= ' AND speed_test.type=?';
+        $parameters[] = $type;
+    }
+
+    $stmt = $connection->prepare($query);
+    $stmt->execute($parameters);
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function fetchUserSpeedTests($connection, int $userId): array
+function fetchUserSpeedTests($connection, int $userId, ?string $type): array
 {
-    $stmt = $connection->prepare('
-        SELECT `speed_test`.`id`, `speed_test`.`user_id`, `speed_test`.`data` FROM `speed_test`
+    $parameters[] = $userId;
+    $parameters[] = $userId;
+    $query = '
+        SELECT `speed_test`.`id`, `speed_test`.`user_id`, `speed_test`.`data`, `speed_test`.`type` FROM `speed_test`
         JOIN settings ON speed_test.user_id=settings.user_id
-        WHERE settings.can_compare_tests=1 AND settings.user_id=?
-    ');
-    $stmt->execute([$userId]);
+        WHERE settings.can_compare_tests=1 AND settings.user_id=? AND speed_test.user_id=?
+    ';
+
+    if ($type) {
+        $query .= ' AND speed_test.type=?';
+        $parameters[] = $type;
+    }
+
+    $stmt = $connection->prepare($query);
+    $stmt->execute($parameters);
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
