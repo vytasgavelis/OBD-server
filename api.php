@@ -51,9 +51,9 @@ try {
         }
 
         if ($_GET['action'] === 'upload_speed_test') {
-            if (isset($_POST['user_id'], $_POST['speed_test_data'])) {
-                $output['success'] = false;
-                if (insertSpeedData($connection, $_POST['user_id'], $_POST['speed_test_data'])) {
+            $output['success'] = false;
+            if (isset($_POST['user_id'], $_POST['speed_test_data'], $_POST['speed_test_type'])) {
+                if (insertSpeedData($connection, $_POST['user_id'], $_POST['speed_test_data'], $_POST['speed_test_type'])) {
                     $output['success'] = true;
                 }
             }
@@ -126,10 +126,10 @@ function login($connection, string $email, string $password): ?array
     return null;
 }
 
-function insertSpeedData($connection, int $userId, string $speedTestData): bool
+function insertSpeedData($connection, int $userId, string $speedTestData, string $type): bool
 {
-    $stmt = $connection->prepare('INSERT INTO speed_test (user_id, data) VALUES(?, ?)');
-    $stmt->execute([$userId, $speedTestData]);
+    $stmt = $connection->prepare('INSERT INTO speed_test (user_id, data, type) VALUES(?, ?, ?)');
+    $stmt->execute([$userId, $speedTestData, $type]);
 
     return true;
 }
